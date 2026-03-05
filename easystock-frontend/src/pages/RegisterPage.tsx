@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { Plus, Trash2 } from "lucide-react";
 
@@ -14,7 +14,6 @@ type Branch = { name: string; location: string };
 
 export function RegisterPage() {
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   const [fullName, setFullName] = React.useState("");
   const [email, setEmail] = React.useState("");

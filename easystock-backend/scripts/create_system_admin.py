@@ -20,22 +20,27 @@ def main():
     db = next(get_db())
     existing = db.query(User).filter(User.email == email).first()
     if existing:
-        if existing.role == UserRole.SYSTEM_ADMIN:
-            print(f"System admin already exists: {email}")
-        else:
-            print(f"User {email} exists but is not system admin. Update manually.")
-        return
-
-    user = User(
-        business_id=None,
-        email=email,
-        full_name=full_name,
-        password_hash=get_password_hash(password),
-        role=UserRole.SYSTEM_ADMIN,
-    )
-    db.add(user)
+        # Idempotent: ensure this user is a system admin with the desired password
+        existing.role = UserRole.SYSTEM_ADMIN
+        existing.business_id = None
+        existing.full_name = full_name or existing.full_name
+        existing.password_hash = get_password_hash(password)
+        existing.is_active = True
+        existing.email_verified = True
+        print(f"Updated existing system admin user: {email}")
+    else:
+        user = User(
+            business_id=None,
+            email=email,
+            full_name=full_name,
+            password_hash=get_password_hash(password),
+            role=UserRole.SYSTEM_ADMIN,
+            is_active=True,
+            email_verified=True,
+        )
+        db.add(user)
+        print(f"System admin created: {email}")
     db.commit()
-    print(f"System admin created: {email}")
 
 
 if __name__ == "__main__":

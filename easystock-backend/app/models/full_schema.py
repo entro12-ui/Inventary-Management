@@ -23,7 +23,7 @@ from app.database import Base
 
 class UserRole(str, enum.Enum):
     """Values must match PostgreSQL userrole enum exactly."""
-    SYSTEM_ADMIN = "system_admin"
+    SYSTEM_ADMIN = "SYSTEM_ADMIN"
     OWNER = "OWNER"
     MANAGER = "MANAGER"
     STAFF = "STAFF"

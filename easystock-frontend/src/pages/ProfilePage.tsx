@@ -23,6 +23,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
 
   const [business, setBusiness] = React.useState<BusinessMe | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
   const [showChangePassword, setShowChangePassword] = React.useState(false);
   const [currentPassword, setCurrentPassword] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
@@ -38,7 +39,10 @@ export function ProfilePage() {
 
     apiRequest<BusinessMe>("/api/business/me", { token, signal: controller.signal })
       .then(setBusiness)
-      .catch(() => {});
+      .catch((err) => {
+        if (err instanceof ApiError) setError(err.message);
+        else setError("Failed to load profile");
+      });
 
     return () => controller.abort();
   }, [token, isSystemAdmin]);
@@ -72,7 +76,10 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto w-full max-w-md space-y-4 sm:max-w-5xl lg:max-w-7xl">
-      <div className="rounded-2xl bg-primary px-4 py-5 text-primary-foreground">
+      <div
+        className="rounded-2xl px-4 py-5 text-primary-foreground"
+        style={{ backgroundColor: "rgb(40 102 195)" }}
+      >
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 overflow-hidden rounded-full bg-primary-foreground/15">
             {!isSystemAdmin && business?.logo_url ? (
@@ -102,6 +109,8 @@ export function ProfilePage() {
           <div className="truncate text-xs opacity-80">{user?.email ?? "—"}</div>
         </div>
       </div>
+
+      {error ? <div className="text-sm text-destructive">{error}</div> : null}
 
       <Card>
         <CardHeader className="pb-2">

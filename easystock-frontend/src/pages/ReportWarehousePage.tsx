@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, apiRequest } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
