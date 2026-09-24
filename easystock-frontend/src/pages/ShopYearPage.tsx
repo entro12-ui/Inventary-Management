@@ -97,16 +97,16 @@ export function ShopYearPage() {
 
   return (
     <div className="mx-auto w-full max-w-md space-y-4 pb-8 sm:max-w-5xl lg:max-w-7xl">
-      <div className="flex items-center gap-2 rounded-t-xl px-4 py-3" style={{ backgroundColor: "rgb(40 102 195)" }}>
-        <Button variant="ghost" size="icon" aria-label="Back" onClick={() => navigate(-1)} className="text-white hover:bg-white/20 hover:text-white">
+      <div className="flex items-center gap-2 rounded-t-xl bg-hero px-4 py-3 text-hero-foreground">
+        <Button variant="ghost" size="icon" aria-label="Back" onClick={() => navigate(-1)} className="text-hero-foreground hover:bg-white/20 hover:text-hero-foreground">
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <div className="flex-1 text-center text-base font-semibold text-white">This Year</div>
+        <div className="flex-1 text-center font-display text-base font-semibold">This year</div>
         <div className="h-10 w-10" />
       </div>
 
-      <div className="rounded-b-xl border border-t-0 bg-white p-4 shadow-sm">
-        <div className="mb-4 text-sm font-semibold">Sales history</div>
+      <div className="rounded-b-xl border border-t-0 border-border/70 bg-card p-4 shadow-sm">
+        <div className="mb-4 font-display text-sm font-semibold">Sales history</div>
         {bars.length === 0 ? (
           <div className="flex h-52 items-center justify-center text-sm text-muted-foreground">No sales data for this period</div>
         ) : (

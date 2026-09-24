@@ -12,7 +12,12 @@ type AuthContextValue = {
   register: (
     email: string,
     fullName: string,
-    opts: { businessName: string; phone?: string; branches?: { name: string; location?: string }[] }
+    opts: {
+      businessName: string;
+      phone?: string;
+      businessType?: string;
+      branches?: { name: string; location?: string }[];
+    }
   ) => Promise<void>;
   activateAccount: (email: string, otp: string, newPassword: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -75,9 +80,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function register(
     email: string,
     fullName: string,
-    opts: { businessName: string; phone?: string; branches?: { name: string; location?: string }[] }
+    opts: {
+      businessName: string;
+      phone?: string;
+      businessType?: string;
+      branches?: { name: string; location?: string }[];
+    }
   ) {
-    const body: Record<string, unknown> = { email, full_name: fullName, business_name: opts.businessName.trim() };
+    const body: Record<string, unknown> = {
+      email,
+      full_name: fullName,
+      business_name: opts.businessName.trim(),
+      business_type: opts.businessType || "general",
+    };
     if (opts.phone?.trim()) body.phone = opts.phone.trim();
     if (opts.branches?.length) body.branches = opts.branches;
     await apiRequest<{ message: string }>("/api/auth/register", {

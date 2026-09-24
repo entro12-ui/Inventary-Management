@@ -60,7 +60,7 @@ export function ReportShopPage() {
         <div className="text-2xl font-bold">{currency} {shopTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
       </div>
 
-      <Card className="overflow-hidden border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20">
+      <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Shop</CardTitle>

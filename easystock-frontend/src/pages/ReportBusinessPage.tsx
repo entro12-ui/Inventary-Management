@@ -111,7 +111,7 @@ export function ReportBusinessPage() {
           <CardContent className="pt-0">
             <div className="max-h-80 overflow-x-auto overflow-y-auto rounded-md border">
               <table className="w-full min-w-[600px] text-sm">
-                <thead className="sticky top-0 bg-blue-600 text-white">
+                <thead className="sticky top-0 bg-primary text-primary-foreground">
                   <tr>
                     <th className="p-2 text-left">No</th>
                     <th className="p-2 text-left">Item name</th>

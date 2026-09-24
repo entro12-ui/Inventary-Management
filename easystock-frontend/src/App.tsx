@@ -8,6 +8,7 @@ import { AdminDashboardPage } from "@/pages/AdminDashboardPage";
 import { BranchesPage } from "@/pages/BranchesPage";
 import { CompanyUsersPage } from "@/pages/CompanyUsersPage";
 import { CreditPage } from "@/pages/CreditPage";
+import { DailyClosingPage } from "@/pages/DailyClosingPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { HomePage } from "@/pages/HomePage";
 import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
@@ -26,6 +27,9 @@ import { SalesPage } from "@/pages/SalesPage";
 import { SalesHistoryPage } from "@/pages/SalesHistoryPage";
 import { ShopYearPage } from "@/pages/ShopYearPage";
 import { WarehousePage } from "@/pages/WarehousePage";
+import { ProformasPage } from "@/pages/ProformasPage";
+import { ProformaEditPage } from "@/pages/ProformaEditPage";
+import { ProformaViewPage } from "@/pages/ProformaViewPage";
 
 export default function App() {
   return (
@@ -48,7 +52,12 @@ export default function App() {
           <Route path="/shop" element={<SalesHistoryPage />} />
           <Route path="/sales-history" element={<ShopYearPage />} />
           <Route path="/credit" element={<CreditPage />} />
+          <Route path="/proformas" element={<ProformasPage />} />
+          <Route path="/proformas/new" element={<ProformaEditPage />} />
+          <Route path="/proformas/:id/edit" element={<ProformaEditPage />} />
+          <Route path="/proformas/:id" element={<ProformaViewPage />} />
           <Route path="/report" element={<ReportPage />} />
+          <Route path="/report/daily" element={<DailyClosingPage />} />
           <Route path="/report/warehouse" element={<ReportWarehousePage />} />
           <Route path="/report/shop" element={<ReportShopPage />} />
           <Route path="/report/business" element={<ReportBusinessPage />} />

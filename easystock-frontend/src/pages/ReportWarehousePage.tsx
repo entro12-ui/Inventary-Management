@@ -86,7 +86,7 @@ export function ReportWarehousePage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="overflow-hidden border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+      <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Warehouse</CardTitle>
@@ -96,14 +96,14 @@ export function ReportWarehousePage() {
             <button
               type="button"
               onClick={() => setWarehouseView("items")}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${warehouseView === "items" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200"}`}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${warehouseView === "items" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
               Total items per branch
             </button>
             <button
               type="button"
               onClick={() => setWarehouseView("networth")}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${warehouseView === "networth" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200"}`}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${warehouseView === "networth" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
               Total Net worth per branch
             </button>
@@ -112,7 +112,7 @@ export function ReportWarehousePage() {
         <CardContent className="pt-0">
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-sm">
-              <thead className="bg-blue-100 dark:bg-blue-900/50">
+              <thead className="bg-muted">
                 <tr>
                   <th className="p-2 text-left font-medium">Branch name</th>
                   <th className="p-2 text-right font-medium">Quantity</th>
@@ -128,7 +128,7 @@ export function ReportWarehousePage() {
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-blue-200/70 dark:bg-blue-900/70 font-semibold">
+              <tfoot className="bg-muted/80 font-semibold">
                 <tr>
                   <td className="p-2">Total</td>
                   <td className="p-2 text-right">{warehouseQtyTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -140,7 +140,7 @@ export function ReportWarehousePage() {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20">
+      <Card className="overflow-hidden border-border/70 bg-secondary/40 shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Shop</CardTitle>

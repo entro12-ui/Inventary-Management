@@ -114,36 +114,37 @@ export function CreditPage() {
         <Button variant="ghost" size="icon" aria-label="Back" onClick={() => navigate(-1)}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <div className="relative w-full">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by cheque No, customer name, ..."
-            className="pl-9"
-          />
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-lg font-semibold tracking-tight">Credit</div>
+          <div className="relative mt-2 w-full">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by customer name…"
+              className="pl-9"
+            />
+          </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-        <button type="button" className="inline-flex items-center gap-1" onClick={() => {}}>
-          <span>Filter</span>
-        </button>
+        <span>{filtered.length} open credit sales</span>
         <button
           type="button"
-          className="inline-flex items-center gap-1"
+          className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 font-medium text-foreground transition hover:bg-accent"
           onClick={() => setSort((s) => (s === "date_desc" ? "amount_desc" : "date_desc"))}
         >
-          <span>Sort by</span>
+          <span>Sort: {sort === "date_desc" ? "Date" : "Amount"}</span>
         </button>
       </div>
 
-      <div className="divide-y rounded-lg border bg-card">
+      <div className="divide-y rounded-xl border border-border/70 bg-card">
         {filtered.map((s) => (
           <button
             key={s.id}
             type="button"
-            className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-accent"
+            className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition hover:bg-accent/60"
             onClick={() => {
               setSelected(s);
               setPayAmount("");
@@ -164,7 +165,10 @@ export function CreditPage() {
         ))}
 
         {filtered.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">No credit sales</div>
+          <div className="space-y-1 px-4 py-10 text-center">
+            <div className="font-display text-base font-semibold">No credit sales</div>
+            <p className="text-sm text-muted-foreground">Credit sales will appear here for follow-up payments.</p>
+          </div>
         ) : null}
       </div>
 

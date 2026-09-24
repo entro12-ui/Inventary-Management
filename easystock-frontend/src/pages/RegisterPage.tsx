@@ -1,24 +1,23 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-
 import { Plus, Trash2 } from "lucide-react";
-
 import { ApiError } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BUSINESS_TYPE_OPTIONS, type BusinessType } from "@/lib/business-type";
 
 type Branch = { name: string; location: string };
 
 export function RegisterPage() {
   const { register } = useAuth();
-
   const [fullName, setFullName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [businessName, setBusinessName] = React.useState("");
   const [phone, setPhone] = React.useState("");
+  const [businessType, setBusinessType] = React.useState<BusinessType>("general");
   const [branches, setBranches] = React.useState<Branch[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -33,9 +32,7 @@ export function RegisterPage() {
   }
 
   function updateBranch(i: number, field: "name" | "location", value: string) {
-    setBranches((prev) =>
-      prev.map((b, idx) => (idx === i ? { ...b, [field]: value } : b))
-    );
+    setBranches((prev) => prev.map((b, idx) => (idx === i ? { ...b, [field]: value } : b)));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -54,6 +51,7 @@ export function RegisterPage() {
       await register(email, fullName, {
         businessName: businessName.trim(),
         phone: phone.trim() || undefined,
+        businessType,
         branches: branchList.length > 0 ? branchList : undefined,
       });
       setSuccess(true);
@@ -67,142 +65,145 @@ export function RegisterPage() {
 
   if (success) {
     return (
-      <div className="mx-auto flex min-h-screen max-w-md items-center px-4 py-8">
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>Registration submitted</CardTitle>
-            <CardDescription>
-              Your company registration is pending approval. The system admin will review and approve your request.
-              After approval, you will receive a one-time password (OTP). Use that OTP to set your password and activate your account.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Go to the <strong>Activate account</strong> page once you receive the OTP.
-            </p>
-            <Button asChild className="mt-4 w-full">
-              <Link to="/activate">Activate account</Link>
-            </Button>
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              <Link className="text-primary underline-offset-4 hover:underline" to="/login">
-                Back to login
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthShell
+        title="Registration submitted"
+        description="Your company is pending admin approval. After approval you will receive an OTP to set your password."
+      >
+        <p className="text-sm text-muted-foreground">
+          Go to <strong>Activate account</strong> once you receive the OTP — works for any shop type.
+        </p>
+        <Button asChild className="mt-4 w-full">
+          <Link to="/activate">Activate account</Link>
+        </Button>
+        <div className="mt-4 text-center text-sm text-muted-foreground">
+          <Link className="font-medium text-primary underline-offset-4 hover:underline" to="/login">
+            Back to login
+          </Link>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md items-center px-4 py-8">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Register company</CardTitle>
-          <CardDescription>
-            Register your company. No password yet. After system admin approval, you will receive a one-time password (OTP) to set your password and activate your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-4" onSubmit={onSubmit}>
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Admin full name *</Label>
-              <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Admin email *</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="businessName">Company name *</Label>
-              <Input
-                id="businessName"
-                placeholder="e.g. My Company Ltd"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone (optional)</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="+251..."
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
+    <AuthShell
+      title="Register company"
+      description="For retail, bakery, pharmacy, building materials, and more. No password yet — after admin approval you get an OTP to activate."
+    >
+      <form className="space-y-4" onSubmit={onSubmit}>
+        <div className="space-y-2">
+          <Label htmlFor="fullName">Admin full name *</Label>
+          <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Admin email *</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="businessName">Company name *</Label>
+          <Input
+            id="businessName"
+            placeholder="e.g. Sunrise Bakery or City Hardware"
+            value={businessName}
+            onChange={(e) => setBusinessName(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="businessType">Business type *</Label>
+          <select
+            id="businessType"
+            className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={businessType}
+            onChange={(e) => setBusinessType(e.target.value as BusinessType)}
+          >
+            {BUSINESS_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            {BUSINESS_TYPE_OPTIONS.find((o) => o.value === businessType)?.hint}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone (optional)</Label>
+          <Input
+            id="phone"
+            type="tel"
+            placeholder="+251..."
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Branches (optional)</Label>
-                <Button type="button" variant="ghost" size="sm" onClick={addBranch}>
-                  <Plus className="h-4 w-4" />
-                  Add branch
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Add 0, 1, 2, or more branches. Need 2+ branches to transfer stock between them.
-              </p>
-              {branches.length === 0 ? (
-                <p className="rounded-lg border border-dashed p-3 text-center text-sm text-muted-foreground">
-                  No branches. Click &quot;Add branch&quot; to add, or leave empty (default Main Warehouse will be created).
-                </p>
-              ) : null}
-              {branches.map((b, i) => (
-                <div key={i} className="flex gap-2 rounded-lg border p-2">
-                  <div className="flex-1 space-y-1">
-                    <Input
-                      placeholder="Branch name"
-                      value={b.name}
-                      onChange={(e) => updateBranch(i, "name", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Location (optional)"
-                      value={b.location}
-                      onChange={(e) => updateBranch(i, "location", e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeBranch(i)}
-                    aria-label="Remove branch"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {error ? <div className="text-sm text-destructive">{error}</div> : null}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Register company"}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Branches (optional)</Label>
+            <Button type="button" variant="ghost" size="sm" onClick={addBranch}>
+              <Plus className="h-4 w-4" />
+              Add branch
             </Button>
-            <div className="text-center text-sm text-muted-foreground">
-              Already activated?{" "}
-              <Link className="text-primary underline-offset-4 hover:underline" to="/login">
-                Sign in
-              </Link>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Add branches to transfer stock between locations. Leave empty for a default Main Warehouse.
+          </p>
+          {branches.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border p-3 text-center text-sm text-muted-foreground">
+              No branches yet — click Add branch, or continue with the default warehouse.
+            </p>
+          ) : null}
+          {branches.map((b, i) => (
+            <div key={i} className="flex gap-2 rounded-lg border border-border bg-muted/40 p-2">
+              <div className="flex-1 space-y-1">
+                <Input
+                  placeholder="Branch name"
+                  value={b.name}
+                  onChange={(e) => updateBranch(i, "name", e.target.value)}
+                />
+                <Input
+                  placeholder="Location (optional)"
+                  value={b.location}
+                  onChange={(e) => updateBranch(i, "location", e.target.value)}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeBranch(i)}
+                aria-label="Remove branch"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
-            <div className="text-center text-sm text-muted-foreground">
-              Have an OTP?{" "}
-              <Link className="text-primary underline-offset-4 hover:underline" to="/activate">
-                Activate account
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          ))}
+        </div>
+
+        {error ? <div className="text-sm text-destructive">{error}</div> : null}
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? "Submitting..." : "Register company"}
+        </Button>
+        <div className="text-center text-sm text-muted-foreground">
+          Already activated?{" "}
+          <Link className="font-medium text-primary underline-offset-4 hover:underline" to="/login">
+            Sign in
+          </Link>
+        </div>
+        <div className="text-center text-sm text-muted-foreground">
+          Have an OTP?{" "}
+          <Link className="font-medium text-primary underline-offset-4 hover:underline" to="/activate">
+            Activate account
+          </Link>
+        </div>
+      </form>
+    </AuthShell>
   );
 }

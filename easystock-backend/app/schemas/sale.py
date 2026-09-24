@@ -19,6 +19,7 @@ class SaleCreate(BaseModel):
     customer_phone: str | None = Field(default=None, max_length=50)
     notes: str | None = None
     paid_amount: float | None = Field(default=None, ge=0)
+    payment_proof_url: str | None = Field(default=None, max_length=500)
 
 
 class SaleItemResponse(BaseModel):
@@ -36,6 +37,7 @@ class SaleResponse(BaseModel):
     sale_date: datetime
     payment_status: str
     payment_method: PaymentMethod
+    payment_proof_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -56,6 +58,10 @@ class SaleDetailResponse(BaseModel):
     id: UUID
     invoice_number: str
     total_amount: float
+    paid_amount: float = 0.0
+    remaining_amount: float = 0.0
+    notes: str | None = None
+    payment_proof_url: str | None = None
     items: list[SaleDetailItemResponse] = []
     customer_name: str | None = None
     customer_phone: str | None = None

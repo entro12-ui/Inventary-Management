@@ -35,6 +35,7 @@ def register(payload: CompanyRegister, db: Session = Depends(get_db_session)) ->
         phone=payload.phone,
         max_stores=10,
         approval_status="pending",
+        business_type=payload.business_type or "general",
     )
     db.add(business)
     db.flush()

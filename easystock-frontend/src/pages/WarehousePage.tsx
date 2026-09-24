@@ -1,38 +1,45 @@
 import * as React from "react";
 
 import {
-  ArrowDownUp,
   Building2,
-  Boxes,
   Filter,
   FileText,
   Layers2,
-  Layers3,
   MoreHorizontal,
   Plus,
-  QrCode,
   Search,
   SquarePen,
   Trash2,
   Upload,
   Download,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { ApiError, apiRequest, getFullImageUrl } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { ExpiryBadge } from "@/components/ui/expiry-badge";
 import { Input } from "@/components/ui/input";
+import { SaleUnitFields } from "@/components/ui/sale-unit-fields";
+import { getExpiryStatus } from "@/lib/expiry";
+import { saleUnitLabel, saleUnitShort } from "@/lib/sale-unit";
+import type { SaleUnit } from "@/lib/sale-unit";
+import { cn } from "@/lib/utils";
 
 type Product = {
   id: string;
   name: string;
   sku: string;
   barcode?: string | null;
+  batch_no?: string | null;
   selling_price: number;
   quantity: number;
+  min_stock?: number;
+  sale_unit?: string | null;
+  sale_unit_custom?: string | null;
   image_url?: string | null;
+  expiry_date?: string | null;
 };
 
 function formatMoney(value: number) {
@@ -43,14 +50,21 @@ function formatMoney(value: number) {
 export function WarehousePage() {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const expiringOnly = searchParams.get("expiring") === "1";
+  const stockFilter = searchParams.get("stock"); // "out" | "low" | null
+  const initialQuery = searchParams.get("q") ?? "";
 
-  const [query, setQuery] = React.useState("");
+  const [query, setQuery] = React.useState(initialQuery);
   const [products, setProducts] = React.useState<Product[]>([]);
   const [error, setError] = React.useState<string | null>(null);
 
   const [selected, setSelected] = React.useState<Product | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [adjustQty, setAdjustQty] = React.useState("1");
+  const [minStockEdit, setMinStockEdit] = React.useState("10");
+  const [saleUnitEdit, setSaleUnitEdit] = React.useState<SaleUnit>("piece");
+  const [saleUnitCustomEdit, setSaleUnitCustomEdit] = React.useState("");
   const [isActionBusy, setIsActionBusy] = React.useState(false);
 
   const [selectedStoreId, setSelectedStoreId] = React.useState<string>("");
@@ -60,29 +74,89 @@ export function WarehousePage() {
   const [toStoreId, setToStoreId] = React.useState("");
   const [transferQty, setTransferQty] = React.useState("1");
   const [isTransferring, setIsTransferring] = React.useState(false);
+  const [businessMinStock, setBusinessMinStock] = React.useState(10);
+
+  React.useEffect(() => {
+    setQuery(searchParams.get("q") ?? "");
+  }, [searchParams]);
 
   const loadProducts = React.useCallback(() => {
     if (!token) return;
-    const url = selectedStoreId
-      ? `/api/products?skip=0&limit=200&store_id=${selectedStoreId}`
-      : "/api/products?skip=0&limit=200";
-    apiRequest<Product[]>(url, { token })
+    const params = new URLSearchParams({ skip: "0", limit: "200" });
+    if (selectedStoreId) params.set("store_id", selectedStoreId);
+    // Stock filters need full list; only use API expiring filter when that chip is active alone
+    if (expiringOnly && stockFilter !== "out" && stockFilter !== "low") {
+      params.set("expiring", "true");
+    }
+    apiRequest<Product[]>(`/api/products?${params}`, { token })
       .then(setProducts)
       .catch((err) => {
         if (err instanceof ApiError) setError(err.message);
         else setError("Failed to load warehouse items");
       });
-  }, [token, selectedStoreId]);
+  }, [token, selectedStoreId, expiringOnly, stockFilter]);
 
   function openActions(p: Product) {
     setSelected(p);
     setAdjustQty("1");
+    setMinStockEdit(String(p.min_stock ?? businessMinStock));
+    setSaleUnitEdit(((p.sale_unit as SaleUnit) || "piece"));
+    setSaleUnitCustomEdit(p.sale_unit_custom ?? "");
     setSheetOpen(true);
   }
 
   function updateLocalProduct(updated: Product) {
     setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     setSelected(updated);
+  }
+
+  async function saveMinStock() {
+    if (!token || !selected) return;
+    const value = Math.max(0, Number.parseInt(minStockEdit || "0", 10) || 0);
+    setIsActionBusy(true);
+    setError(null);
+    try {
+      const updated = await apiRequest<Product>(`/api/products/${selected.id}`, {
+        method: "PATCH",
+        token,
+        body: { min_stock: value },
+      });
+      updateLocalProduct(updated);
+      setMinStockEdit(String(updated.min_stock ?? value));
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+      else setError("Failed to update minimum stock");
+    } finally {
+      setIsActionBusy(false);
+    }
+  }
+
+  async function saveSaleUnit() {
+    if (!token || !selected) return;
+    if (saleUnitEdit === "other" && !saleUnitCustomEdit.trim()) {
+      setError("Select or type a custom unit for Other");
+      return;
+    }
+    setIsActionBusy(true);
+    setError(null);
+    try {
+      const updated = await apiRequest<Product>(`/api/products/${selected.id}`, {
+        method: "PATCH",
+        token,
+        body: {
+          sale_unit: saleUnitEdit,
+          sale_unit_custom: saleUnitEdit === "other" ? saleUnitCustomEdit.trim() : null,
+        },
+      });
+      updateLocalProduct(updated);
+      setSaleUnitEdit(((updated.sale_unit as SaleUnit) || saleUnitEdit));
+      setSaleUnitCustomEdit(updated.sale_unit_custom ?? "");
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+      else setError("Failed to update sold-as unit");
+    } finally {
+      setIsActionBusy(false);
+    }
   }
 
   async function patchQuantity(delta: number) {
@@ -124,33 +198,20 @@ export function WarehousePage() {
   }
 
   React.useEffect(() => {
-    if (!token) return;
-    let canceled = false;
-
-    const url = selectedStoreId ? `/api/products?skip=0&limit=200&store_id=${selectedStoreId}` : "/api/products?skip=0&limit=200";
-    apiRequest<Product[]>(url, { token })
-      .then((list) => {
-        if (!canceled) setProducts(list);
-      })
-      .catch((err) => {
-        if (canceled) return;
-        if (err instanceof ApiError) setError(err.message);
-        else setError("Failed to load warehouse items");
-      });
-
-    return () => {
-      canceled = true;
-    };
-  }, [token, selectedStoreId]);
+    loadProducts();
+  }, [loadProducts]);
 
   React.useEffect(() => {
     if (!token) return;
     apiRequest<{ id: string; name: string; location?: string | null }[]>("/api/business/stores", { token })
       .then(setStores)
       .catch(() => setStores([]));
+    apiRequest<{ default_min_stock?: number }>("/api/business/me", { token })
+      .then((b) => {
+        if (b.default_min_stock != null) setBusinessMinStock(b.default_min_stock);
+      })
+      .catch(() => {});
   }, [token]);
-
-  React.useEffect(loadProducts, [loadProducts]);
 
   function openTransfer() {
     if (!selected) return;
@@ -204,15 +265,67 @@ export function WarehousePage() {
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products;
     return products.filter((p) => {
-      const hay = `${p.name} ${p.sku} ${p.barcode ?? ""}`.toLowerCase();
+      if (stockFilter === "out" && (p.quantity ?? 0) > 0) return false;
+      if (stockFilter === "low") {
+        const min = p.min_stock ?? businessMinStock;
+        const qty = p.quantity ?? 0;
+        if (!(qty > 0 && qty <= min)) return false;
+      }
+      if (!q) return true;
+      const hay = `${p.name} ${p.sku} ${p.barcode ?? ""} ${p.batch_no ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [products, query]);
+  }, [products, query, stockFilter, businessMinStock]);
+
+  function setAlertFilter(next: { stock?: "out" | "low" | null; expiring?: boolean }) {
+    const params = new URLSearchParams(searchParams);
+    if (next.stock === undefined) {
+      /* keep */
+    } else if (next.stock) {
+      params.set("stock", next.stock);
+      params.delete("expiring");
+    } else {
+      params.delete("stock");
+    }
+    if (next.expiring === undefined) {
+      /* keep */
+    } else if (next.expiring) {
+      params.set("expiring", "1");
+      params.delete("stock");
+    } else {
+      params.delete("expiring");
+    }
+    setSearchParams(params);
+  }
+
+  function toggleExpiring() {
+    setAlertFilter({ expiring: !expiringOnly, stock: null });
+  }
+
+  function toggleStock(kind: "out" | "low") {
+    const active = stockFilter === kind;
+    setAlertFilter({ stock: active ? null : kind, expiring: false });
+  }
+
+  const filterLabel =
+    stockFilter === "out"
+      ? "Showing out-of-stock items"
+      : stockFilter === "low"
+        ? "Showing items that need reorder"
+        : expiringOnly
+          ? "Showing items expiring within 30 days"
+          : "Stock across branches";
 
   return (
     <div className="mx-auto w-full max-w-md space-y-3 sm:max-w-5xl lg:max-w-7xl">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-xl font-semibold tracking-tight">Warehouse</h1>
+          <p className="text-sm text-muted-foreground">{filterLabel}</p>
+        </div>
+      </div>
+
       {stores.length > 1 ? (
         <div className="flex items-center gap-2">
           <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -233,41 +346,76 @@ export function WarehousePage() {
       <div className="flex items-center gap-2">
         <div className="relative w-full">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" className="pl-9" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name, SKU, barcode, batch…"
+            className="pl-9"
+          />
         </div>
-
-        <Button variant="outline" size="icon" aria-label="Scan">
-          <QrCode className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="icon" aria-label="Collections">
-          <Layers3 className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="icon" aria-label="More">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
       </div>
 
-      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <button type="button" className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-accent">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() => toggleStock("low")}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-medium transition",
+            stockFilter === "low"
+              ? "bg-warning/20 text-warning-foreground"
+              : "bg-muted text-muted-foreground hover:bg-accent",
+          )}
+        >
           <Filter className="h-3.5 w-3.5" />
-          <span>Filter</span>
+          <span>Need reorder</span>
         </button>
-        <button type="button" className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-accent">
-          <ArrowDownUp className="h-3.5 w-3.5" />
-          <span>Sort by</span>
+        <button
+          type="button"
+          onClick={() => toggleStock("out")}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-medium transition",
+            stockFilter === "out"
+              ? "bg-destructive/15 text-destructive"
+              : "bg-muted text-muted-foreground hover:bg-accent",
+          )}
+        >
+          <Filter className="h-3.5 w-3.5" />
+          <span>Out of stock</span>
         </button>
-        <button type="button" className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-accent">
-          <Boxes className="h-3.5 w-3.5" />
-          <span>Collection</span>
+        <button
+          type="button"
+          onClick={toggleExpiring}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-medium transition",
+            expiringOnly
+              ? "bg-warning/20 text-warning-foreground"
+              : "bg-muted text-muted-foreground hover:bg-accent",
+          )}
+        >
+          <Filter className="h-3.5 w-3.5" />
+          <span>Expiring soon</span>
         </button>
+        {(stockFilter || expiringOnly) && (
+          <button
+            type="button"
+            onClick={() => setAlertFilter({ stock: null, expiring: false })}
+            className="rounded-full bg-muted px-3 py-1.5 font-medium text-foreground hover:bg-accent"
+          >
+            Clear filter
+          </button>
+        )}
+        <span className="text-muted-foreground">{filtered.length} items</span>
       </div>
 
       {error ? <div className="text-sm text-destructive">{error}</div> : null}
 
-      <div className="divide-y rounded-lg border bg-card lg:grid lg:grid-cols-2 xl:grid-cols-2 lg:divide-y-0 lg:gap-4 lg:divide-x-0">
+      <div className="divide-y rounded-xl border border-border/70 bg-card lg:grid lg:grid-cols-2 xl:grid-cols-2 lg:divide-y-0 lg:gap-4 lg:divide-x-0">
         {filtered.map((p) => {
           const available = p.quantity > 0;
           const outOfStock = p.quantity <= 0;
+          const min = p.min_stock ?? businessMinStock;
+          const lowStock = available && p.quantity <= min;
+          const expiryStatus = getExpiryStatus(p.expiry_date);
           const initials = (p.name || "Item")
             .split(" ")
             .filter(Boolean)
@@ -280,14 +428,20 @@ export function WarehousePage() {
               key={p.id}
               role="button"
               tabIndex={0}
-              className={`flex w-full cursor-pointer gap-3 p-3 text-left hover:bg-accent/50 lg:rounded-lg lg:border lg:p-4 ${outOfStock ? "border-l-4 border-l-destructive bg-destructive/5 lg:border-l-4" : ""}`}
+              className={cn(
+                "flex w-full cursor-pointer gap-3 p-3 text-left transition hover:bg-accent/50 lg:rounded-lg lg:border lg:p-4",
+                outOfStock && "border-l-4 border-l-destructive bg-destructive/5 lg:border-l-4",
+                lowStock && !outOfStock && "border-l-4 border-l-warning bg-warning/5",
+                expiryStatus === "expired" && "border-l-4 border-l-destructive",
+                expiryStatus === "soon" && !outOfStock && !lowStock && "border-l-4 border-l-warning",
+              )}
               onClick={() => openActions(p)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") openActions(p);
               }}
             >
               <div className="flex flex-col items-center gap-2">
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted text-muted-foreground flex items-center justify-center text-xs font-semibold">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-xs font-semibold text-muted-foreground">
                   {p.image_url ? (
                     <img
                       src={getFullImageUrl(p.image_url) ?? p.image_url}
@@ -299,14 +453,16 @@ export function WarehousePage() {
                   )}
                 </div>
                 <div
-                  className={
-                    "rounded-full px-2 py-0.5 text-[10px] font-medium " +
-                    (available
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                      : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300")
-                  }
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                    outOfStock
+                      ? "bg-destructive/10 text-destructive"
+                      : lowStock
+                        ? "bg-warning/20 text-warning-foreground"
+                        : "bg-primary/15 text-primary",
+                  )}
                 >
-                  {available ? "Available" : "Out of stock"}
+                  {outOfStock ? "Out of stock" : lowStock ? "Reorder" : "Available"}
                 </div>
               </div>
 
@@ -315,8 +471,18 @@ export function WarehousePage() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold">{p.name}</div>
                     <div className="mt-0.5 text-xs text-muted-foreground">
-                      P.N: {p.sku}
-                      {p.barcode ? ` · Barcode: ${p.barcode}` : ""}
+                      SKU: {p.sku}
+                      {p.barcode ? ` · ${p.barcode}` : ""}
+                      {p.batch_no ? ` · Batch ${p.batch_no}` : ""}
+                      {` · ${saleUnitLabel(p.sale_unit, p.sale_unit_custom)}`}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <ExpiryBadge expiry={p.expiry_date} />
+                      {lowStock ? (
+                        <span className="rounded-full bg-warning/20 px-2 py-0.5 text-[10px] font-semibold text-warning-foreground">
+                          Soon out of stock
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 
@@ -338,16 +504,16 @@ export function WarehousePage() {
 
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="text-muted-foreground">
-                    stock: <span className="text-primary">{p.quantity}</span>{" "}
+                    stock:{" "}
+                    <span className={cn(lowStock || outOfStock ? "font-semibold text-destructive" : "text-primary")}>
+                      {p.quantity} {saleUnitShort(p.sale_unit, p.sale_unit_custom)}
+                    </span>{" "}
+                    <span className="text-muted-foreground">/ min {min}</span>{" "}
                     <span className="text-primary">
                       ({selectedStoreId ? stores.find((s) => s.id === selectedStoreId)?.name ?? "Branch" : "Total"})
                     </span>
                     <span className="mx-2">·</span>
                     Price: <span className="text-primary">{formatMoney(p.selling_price)}</span>
-                  </div>
-                  <div className="text-muted-foreground">
-                    Quantity: <span className={available ? "text-foreground" : "font-semibold text-destructive"}>{p.quantity}</span>
-                    {outOfStock ? " (insufficient)" : ""}
                   </div>
                 </div>
               </div>
@@ -356,17 +522,53 @@ export function WarehousePage() {
         })}
 
         {filtered.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">No items found.</div>
+          <div className="col-span-full space-y-2 p-8 text-center">
+            <div className="font-display text-base font-semibold text-foreground">
+              {stockFilter === "out"
+                ? "No out-of-stock items"
+                : stockFilter === "low"
+                  ? "No items need reorder"
+                  : expiringOnly
+                    ? "No expiring items"
+                    : "No stock items yet"}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {stockFilter === "out"
+                ? "All products currently have stock available."
+                : stockFilter === "low"
+                  ? "Nothing is at or below the minimum stock level."
+                  : expiringOnly
+                    ? "Nothing is expiring in the next 30 days — great for pharmacies and shops."
+                    : "Add products with optional expiry and batch for pharmacy-ready tracking."}
+            </p>
+            {!expiringOnly && !stockFilter ? (
+              <Button asChild className="mt-2">
+                <Link to="/warehouse/add">Add first item</Link>
+              </Button>
+            ) : (expiringOnly || stockFilter) ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2"
+                onClick={() => setAlertFilter({ stock: null, expiring: false })}
+              >
+                Clear filter
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
       <Button
         asChild
-        className="fixed bottom-20 left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white sm:max-w-5xl sm:bottom-6 sm:w-[min(56rem,calc(100%-2rem))]"
+        className={cn(
+          "fixed bottom-20 left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 sm:bottom-6 sm:max-w-5xl sm:w-[min(56rem,calc(100%-2rem))]",
+          (sheetOpen || transferOpen) && "hidden",
+        )}
       >
         <Link to="/warehouse/add">
           <Plus className="h-4 w-4" />
-          Add item to Warehouse
+          Add stock item
         </Link>
       </Button>
 
@@ -390,18 +592,60 @@ export function WarehousePage() {
         }
       >
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
-            <div>
-              <div className="text-xs font-medium text-amber-800 dark:text-amber-200">Update stock safety</div>
-              <div className="text-xs text-amber-700 dark:text-amber-300">Minimum stock safety is set to 10</div>
-            </div>
-            <Button type="button" variant="outline" size="icon" aria-label="Stock safety" className="border-amber-300 dark:border-amber-700">
-              <Layers2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-2 rounded-lg border border-border/70 bg-card px-3 py-3">
+            <SaleUnitFields
+              compact
+              idPrefix="wh-saleUnit"
+              saleUnit={saleUnitEdit}
+              saleUnitCustom={saleUnitCustomEdit}
+              onSaleUnitChange={setSaleUnitEdit}
+              onSaleUnitCustomChange={setSaleUnitCustomEdit}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!selected || isActionBusy}
+              onClick={saveSaleUnit}
+            >
+              Save sold as
             </Button>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/50">
-            <div className="text-xs text-muted-foreground">Qty</div>
+          <div className="space-y-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-3">
+            <div className="flex items-center gap-2">
+              <Layers2 className="h-4 w-4 text-warning-foreground" />
+              <div className="text-xs font-semibold text-warning-foreground">This item’s min stock</div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Set a different alert level for this product (business default is {businessMinStock}).
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                value={minStockEdit}
+                onChange={(e) => setMinStockEdit(e.target.value)}
+                className="h-9 w-24"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!selected || isActionBusy}
+                onClick={saveMinStock}
+              >
+                Save min
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
+            <div className="text-xs text-muted-foreground">
+              Qty ({saleUnitShort(selected?.sale_unit, selected?.sale_unit_custom)})
+            </div>
             <Input
               value={adjustQty}
               onChange={(e) => setAdjustQty(e.target.value)}
@@ -410,6 +654,8 @@ export function WarehousePage() {
             />
             <div className="ml-auto text-xs text-muted-foreground">
               Current: <span className="text-foreground">{selected?.quantity ?? "—"}</span>
+              {" · "}
+              Min: <span className="text-foreground">{selected?.min_stock ?? businessMinStock}</span>
             </div>
           </div>
 
@@ -447,7 +693,7 @@ export function WarehousePage() {
             <Button
               type="button"
               variant="outline"
-              className="justify-start border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+              className="justify-start"
               onClick={() => patchQuantity(+1)}
               disabled={!selected || isActionBusy}
             >
@@ -469,7 +715,7 @@ export function WarehousePage() {
             <Button
               type="button"
               variant="outline"
-              className="col-span-2 justify-start border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
+              className="col-span-2 justify-start"
               disabled={!selected || isActionBusy}
               onClick={openTransfer}
             >

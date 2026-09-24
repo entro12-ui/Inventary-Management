@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_company_user, get_db_session
 from app.models import Store, StoreInventory
+from app.models.business import Business
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
@@ -19,17 +20,25 @@ def list_products(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     store_id: UUID | None = Query(default=None),
+    expiring: bool = Query(default=False, description="Only products expiring within 30 days or already expired"),
     db: Session = Depends(get_db_session),
     current_user: User = Depends(get_company_user),
 ) -> list[ProductResponse]:
-    products = (
-        db.query(Product)
-        .filter(Product.business_id == current_user.business_id)
-        .order_by(Product.name.asc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    from datetime import datetime, timedelta, timezone
+
+    query = db.query(Product).filter(Product.business_id == current_user.business_id)
+    if expiring:
+        soon_cutoff = datetime.now(timezone.utc) + timedelta(days=30)
+        query = query.filter(
+            Product.expiry_date.isnot(None),
+            Product.expiry_date <= soon_cutoff,
+            Product.quantity > 0,
+        )
+    if expiring:
+        query = query.order_by(Product.expiry_date.asc().nullslast())
+    else:
+        query = query.order_by(Product.name.asc())
+    products = query.offset(skip).limit(limit).all()
     if store_id:
         store = db.get(Store, store_id)
         if not store or store.business_id != current_user.business_id:
@@ -80,18 +89,29 @@ def create_product(
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SKU already exists")
 
+    business = db.get(Business, current_user.business_id)
+    min_stock = (
+        payload.min_stock
+        if payload.min_stock is not None
+        else int(getattr(business, "default_min_stock", None) or 10)
+    )
+
     product = Product(
         business_id=current_user.business_id,
         name=payload.name,
         sku=payload.sku,
         barcode=payload.barcode,
         part_no=payload.part_no,
+        batch_no=payload.batch_no,
         location=payload.location,
         image_url=payload.image_url,
-        min_stock=payload.min_stock,
+        min_stock=min_stock,
+        sale_unit=payload.sale_unit or "piece",
+        sale_unit_custom=payload.sale_unit_custom if (payload.sale_unit or "piece") == "other" else None,
         cost_price=payload.cost_price,
         selling_price=payload.selling_price,
         quantity=payload.quantity,
+        expiry_date=payload.expiry_date,
     )
     db.add(product)
     db.flush()
@@ -133,6 +153,25 @@ def update_product(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+    if "sale_unit" in update_data or "sale_unit_custom" in update_data:
+        next_unit = update_data.get("sale_unit", product.sale_unit) or "piece"
+        next_custom = update_data.get(
+            "sale_unit_custom",
+            product.sale_unit_custom if "sale_unit_custom" not in update_data else None,
+        )
+        if "sale_unit_custom" in update_data and isinstance(next_custom, str):
+            next_custom = next_custom.strip() or None
+        if next_unit == "other" and not next_custom:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Choose a custom unit when Sold as is Other",
+            )
+        if next_unit != "other":
+            update_data["sale_unit_custom"] = None
+        else:
+            update_data["sale_unit_custom"] = next_custom
+        update_data["sale_unit"] = next_unit
+
     for field_name, field_value in update_data.items():
         setattr(product, field_name, field_value)
 

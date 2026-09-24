@@ -15,6 +15,7 @@ class CompanyRegister(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=200)
     business_name: str = Field(..., min_length=1, max_length=200)
     phone: str | None = None
+    business_type: str = Field(default="general", pattern="^(general|pharmacy|bakery|building|retail)$")
     branches: list[BranchCreate] = Field(default_factory=list, max_length=10)
 
 

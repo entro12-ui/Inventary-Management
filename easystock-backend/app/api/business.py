@@ -6,7 +6,7 @@ from app.models.business import Business, Store
 from app.models.user import User
 from app.core.security import get_password_hash
 from app.models.full_schema import UserRole
-from app.schemas.business import BusinessMeResponse, BusinessUserItem, InviteUserCreate
+from app.schemas.business import BusinessMeResponse, BusinessSettingsUpdate, BusinessUserItem, InviteUserCreate
 from app.schemas.store import StoreCreate, StoreResponse
 
 router = APIRouter()
@@ -20,6 +20,25 @@ def get_my_business(
     business = db.get(Business, current_user.business_id)
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    return BusinessMeResponse.model_validate(business)
+
+
+@router.patch("/me", response_model=BusinessMeResponse)
+def update_my_business(
+    payload: BusinessSettingsUpdate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_company_user),
+) -> BusinessMeResponse:
+    business = db.get(Business, current_user.business_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    data = payload.model_dump(exclude_unset=True)
+    if "default_min_stock" in data and data["default_min_stock"] is not None:
+        business.default_min_stock = data["default_min_stock"]
+    if "business_type" in data and data["business_type"]:
+        business.business_type = data["business_type"]
+    db.commit()
+    db.refresh(business)
     return BusinessMeResponse.model_validate(business)
 
 

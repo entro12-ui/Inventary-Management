@@ -109,6 +109,10 @@ def get_sale_detail(
         id=sale.id,
         invoice_number=sale.invoice_number,
         total_amount=float(sale.total_amount or 0),
+        paid_amount=float(sale.paid_amount or 0),
+        remaining_amount=max(float(sale.total_amount or 0) - float(sale.paid_amount or 0), 0.0),
+        notes=sale.notes,
+        payment_proof_url=getattr(sale, "payment_proof_url", None),
         items=items,
         customer_name=sale.customer_name,
         customer_phone=sale.customer_phone,
@@ -280,6 +284,7 @@ def list_sales(
                 sale_date=sale.sale_date,
                 payment_status=_payment_status_label(total_amount, paid_amount),
                 payment_method=sale.payment_method,
+                payment_proof_url=getattr(sale, "payment_proof_url", None),
             )
         )
     return response
@@ -323,6 +328,14 @@ def create_sale(
         line_items.append((product, item.quantity, item.unit_price))
 
     payment_method = payload.payment_method
+    needs_proof = payment_method in (PaymentMethod.BANK, PaymentMethod.MOBILE)
+    if needs_proof and not (payload.payment_proof_url or "").strip():
+        label = "Bank transfer" if payment_method == PaymentMethod.BANK else "Mobile money"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{label} requires a payment screenshot",
+        )
+
     if payload.paid_amount is not None:
         paid_amount = float(payload.paid_amount)
     else:
@@ -352,6 +365,7 @@ def create_sale(
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
         notes=payload.notes,
+        payment_proof_url=(payload.payment_proof_url or None),
     )
     db.add(sale)
     db.flush()
@@ -412,4 +426,5 @@ def create_sale(
         sale_date=sale.sale_date,
         payment_status=_payment_status_label(float(sale.total_amount or 0), float(sale.paid_amount or 0)),
         payment_method=sale.payment_method,
+        payment_proof_url=getattr(sale, "payment_proof_url", None),
     )

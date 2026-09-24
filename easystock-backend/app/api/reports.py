@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -304,6 +305,83 @@ def sales_filtered(
             )
         )
     return out
+
+
+@router.get("/daily-closing")
+def daily_closing(
+    day: date | None = Query(default=None, description="Closing day (defaults to today UTC)"),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_company_user),
+) -> dict:
+    """End-of-day sales summary for shops and pharmacies."""
+    selected = day or datetime.now(timezone.utc).date()
+    start = datetime.combine(selected, datetime.min.time(), tzinfo=timezone.utc)
+    end = datetime.combine(selected, datetime.max.time(), tzinfo=timezone.utc)
+
+    business = db.get(Business, current_user.business_id)
+    min_default = (
+        int(business.default_min_stock)
+        if business and getattr(business, "default_min_stock", None) is not None
+        else settings.DEFAULT_LOW_STOCK_THRESHOLD
+    )
+
+    sales = (
+        db.query(Sale)
+        .filter(
+            Sale.business_id == current_user.business_id,
+            Sale.sale_date >= start,
+            Sale.sale_date <= end,
+        )
+        .order_by(Sale.sale_date.asc())
+        .all()
+    )
+
+    by_method: dict[str, float] = {}
+    total_sales = 0.0
+    total_paid = 0.0
+    total_due = 0.0
+    for sale in sales:
+        amount = float(sale.total_amount or 0)
+        paid = float(sale.paid_amount or 0)
+        total_sales += amount
+        total_paid += paid
+        total_due += max(amount - paid, 0.0)
+        key = sale.payment_method.value if hasattr(sale.payment_method, "value") else str(sale.payment_method)
+        by_method[key] = by_method.get(key, 0.0) + amount
+
+    low_stock = (
+        db.query(Product)
+        .filter(
+            Product.business_id == current_user.business_id,
+            Product.quantity > 0,
+            Product.quantity <= func.coalesce(Product.low_stock_threshold, min_default),
+        )
+        .order_by(Product.quantity.asc())
+        .limit(20)
+        .all()
+    )
+
+    return {
+        "date": selected.isoformat(),
+        "currency": _currency(db, current_user),
+        "sales_count": len(sales),
+        "total_sales": total_sales,
+        "total_paid": total_paid,
+        "total_due": total_due,
+        "by_payment_method": [
+            {"method": method, "amount": amount} for method, amount in sorted(by_method.items())
+        ],
+        "low_stock_items": [
+            {
+                "id": str(p.id),
+                "name": p.name,
+                "sku": p.sku,
+                "quantity": int(p.quantity or 0),
+                "min_stock": int(p.low_stock_threshold if p.low_stock_threshold is not None else min_default),
+            }
+            for p in low_stock
+        ],
+    }
 
 
 @router.get("/export/sales")

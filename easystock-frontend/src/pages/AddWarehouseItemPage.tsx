@@ -1,13 +1,18 @@
 import * as React from "react";
 
-import { Building2, ChevronLeft, Image as ImageIcon, QrCode, X } from "lucide-react";
+import { Building2, ChevronLeft, Image as ImageIcon, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { ApiError, apiRequest, getApiBaseUrl, getFullImageUrl } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
+import { BarcodeField } from "@/components/ui/barcode-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaleUnitFields } from "@/components/ui/sale-unit-fields";
+import { dateInputToIso } from "@/lib/expiry";
+import { saleUnitShort } from "@/lib/sale-unit";
+import type { SaleUnit } from "@/lib/sale-unit";
 
 export function AddWarehouseItemPage() {
   const { token } = useAuth();
@@ -27,7 +32,13 @@ export function AddWarehouseItemPage() {
   const [purchasePrice, setPurchasePrice] = React.useState("");
   const [sellingPrice, setSellingPrice] = React.useState("");
   const [quantity, setQuantity] = React.useState("0");
+  const [minStock, setMinStock] = React.useState("10");
+  const [saleUnit, setSaleUnit] = React.useState<SaleUnit>("piece");
+  const [saleUnitCustom, setSaleUnitCustom] = React.useState("");
+  const [businessMinStock, setBusinessMinStock] = React.useState(10);
   const [location, setLocation] = React.useState("");
+  const [batchNo, setBatchNo] = React.useState("");
+  const [expiryDate, setExpiryDate] = React.useState("");
   const [imageUrl, setImageUrl] = React.useState<string | null>(null);
 
   async function uploadImage(file: File): Promise<string> {
@@ -67,6 +78,13 @@ export function AddWarehouseItemPage() {
     apiRequest<{ id: string; name: string; location?: string | null }[]>("/api/business/stores", { token })
       .then(setStores)
       .catch(() => setStores([]));
+    apiRequest<{ default_min_stock?: number }>("/api/business/me", { token })
+      .then((b) => {
+        const min = b.default_min_stock ?? 10;
+        setBusinessMinStock(min);
+        setMinStock(String(min));
+      })
+      .catch(() => {});
   }, [token]);
 
   React.useEffect(() => {
@@ -80,7 +98,12 @@ export function AddWarehouseItemPage() {
     setPurchasePrice("");
     setSellingPrice("");
     setQuantity("0");
+    setMinStock(String(businessMinStock));
+    setSaleUnit("piece");
+    setSaleUnitCustom("");
     setLocation("");
+    setBatchNo("");
+    setExpiryDate("");
     setImageUrl(null);
   }
 
@@ -91,6 +114,7 @@ export function AddWarehouseItemPage() {
     const trimmedBarcode = barcode.trim();
     const trimmedPartNo = partNo.trim();
     const trimmedLocation = location.trim();
+    const trimmedBatch = batchNo.trim();
 
     if (!trimmedName) {
       setError("Item name is required");
@@ -111,6 +135,11 @@ export function AddWarehouseItemPage() {
       return;
     }
 
+    if (saleUnit === "other" && !saleUnitCustom.trim()) {
+      setError("Select or type a custom unit for Other");
+      return;
+    }
+
     setError(null);
     setIsSubmitting(true);
     try {
@@ -123,12 +152,17 @@ export function AddWarehouseItemPage() {
           sku,
           barcode: trimmedBarcode || null,
           part_no: trimmedPartNo || null,
+          batch_no: trimmedBatch || null,
           location: trimmedLocation || null,
           image_url: imageUrl,
           cost_price: costPrice,
           selling_price: salePrice,
           quantity: qty,
+          min_stock: Math.max(0, Number(minStock) || 0),
+          sale_unit: saleUnit,
+          sale_unit_custom: saleUnit === "other" ? saleUnitCustom.trim() : null,
           store_id: storeId || null,
+          expiry_date: dateInputToIso(expiryDate),
         },
       });
 
@@ -151,7 +185,7 @@ export function AddWarehouseItemPage() {
         <Button variant="ghost" size="icon" aria-label="Back" onClick={() => navigate(-1)}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <div className="text-sm font-semibold">Add Warehouse item</div>
+        <div className="font-display text-sm font-semibold">Add stock item</div>
         <Button variant="ghost" size="icon" aria-label="Close" onClick={() => navigate("/warehouse")}>
           <X className="h-5 w-5" />
         </Button>
@@ -224,29 +258,41 @@ export function AddWarehouseItemPage() {
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
 
-          <div className="grid grid-cols-[1fr_auto] gap-2">
+          <BarcodeField id="barcode" value={barcode} onChange={setBarcode} />
+
+          <div className="space-y-1">
+            <Label htmlFor="partNo">Part No / SKU</Label>
+            <Input id="partNo" value={partNo} onChange={(e) => setPartNo(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="barcode">Barcode</Label>
-              <Input id="barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+              <Label htmlFor="batchNo">Batch / Lot</Label>
+              <Input
+                id="batchNo"
+                value={batchNo}
+                onChange={(e) => setBatchNo(e.target.value)}
+                placeholder="Optional"
+              />
             </div>
-            <div className="flex items-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                aria-label="Scan barcode (focuses field for scanner or paste)"
-                title="Click then scan with barcode scanner, or type/paste barcode"
-                onClick={() => document.getElementById("barcode")?.focus()}
-              >
-                <QrCode className="h-4 w-4" />
-              </Button>
+            <div className="space-y-1">
+              <Label htmlFor="expiry">Expiry date</Label>
+              <Input
+                id="expiry"
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+              />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="partNo">Part No</Label>
-            <Input id="partNo" value={partNo} onChange={(e) => setPartNo(e.target.value)} />
-          </div>
+          <SaleUnitFields
+            compact
+            saleUnit={saleUnit}
+            saleUnitCustom={saleUnitCustom}
+            onSaleUnitChange={setSaleUnit}
+            onSaleUnitCustomChange={setSaleUnitCustom}
+          />
 
           <div className="space-y-1">
             <Label htmlFor="purchase">Purchase price</Label>
@@ -274,9 +320,26 @@ export function AddWarehouseItemPage() {
             />
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="qty">Quantity</Label>
-            <Input id="qty" type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="qty">Quantity ({saleUnitShort(saleUnit, saleUnitCustom)})</Label>
+              <Input id="qty" type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="minStock">This item’s min stock *</Label>
+              <Input
+                id="minStock"
+                type="number"
+                min="0"
+                step="1"
+                value={minStock}
+                onChange={(e) => setMinStock(e.target.value)}
+                required
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Alert when qty reaches this number. Prefilled with business default ({businessMinStock}).
+              </p>
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -289,20 +352,11 @@ export function AddWarehouseItemPage() {
       </div>
 
       <div className="space-y-2">
-        <Button
-          className="w-full border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white"
-          disabled={isSubmitting}
-          onClick={() => submit("back")}
-        >
+        <Button className="w-full" disabled={isSubmitting} onClick={() => submit("back")}>
           {isSubmitting ? "Adding..." : "Add and go back"}
         </Button>
-        <Button
-          className="w-full border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
-          variant="outline"
-          disabled={isSubmitting}
-          onClick={() => submit("continue")}
-        >
-          {isSubmitting ? "Adding..." : "Add and continue to add"}
+        <Button variant="outline" className="w-full" disabled={isSubmitting} onClick={() => submit("continue")}>
+          {isSubmitting ? "Adding..." : "Add and continue"}
         </Button>
       </div>
     </div>

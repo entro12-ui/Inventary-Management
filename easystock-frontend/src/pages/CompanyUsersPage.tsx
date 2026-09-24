@@ -69,7 +69,7 @@ export function CompanyUsersPage() {
   return (
     <div className="mx-auto w-full max-w-md space-y-4 sm:max-w-5xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Company Users</h1>
+        <h1 className="font-display text-xl font-semibold tracking-tight">Company users</h1>
         {canInvite && (
           <Button variant="outline" size="sm" onClick={() => setShowAdd(!showAdd)}>
             <Plus className="h-4 w-4" />

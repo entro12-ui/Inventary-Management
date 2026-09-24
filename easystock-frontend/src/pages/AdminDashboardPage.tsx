@@ -70,27 +70,27 @@ export function AdminDashboardPage() {
   return (
     <div className="mx-auto w-full max-w-md space-y-4 sm:max-w-5xl">
       <div className="pt-2">
-        <div className="text-lg font-semibold">System Admin</div>
-        <div className="text-sm text-muted-foreground">Manage all companies</div>
+        <div className="font-display text-xl font-semibold tracking-tight">System Admin</div>
+        <div className="text-sm text-muted-foreground">Approve shops and pharmacies</div>
       </div>
 
       {error ? <div className="text-sm text-destructive">{error}</div> : null}
 
       {lastOtp ? (
-        <div className="rounded-lg border border-primary bg-primary/5 p-4">
+        <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
           <div className="text-sm font-semibold">OTP generated</div>
           <div className="mt-1 text-xs text-muted-foreground">
             Share this OTP with <strong>{lastOtp.email}</strong> (one-time use, expires in 24h)
           </div>
-          <div className="mt-2 font-mono text-lg font-bold tracking-widest">{lastOtp.otp}</div>
+          <div className="mt-2 font-mono text-lg font-bold tracking-widest text-primary">{lastOtp.otp}</div>
         </div>
       ) : null}
 
-      <Card>
+      <Card className="border-border/70 shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-            <Building2 className="h-4 w-4" />
-            Registered Companies ({companies.length})
+          <CardTitle className="flex items-center gap-2 font-display text-sm font-semibold">
+            <Building2 className="h-4 w-4 text-primary" />
+            Registered companies ({companies.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -98,7 +98,7 @@ export function AdminDashboardPage() {
             {companies.map((c) => (
               <div
                 key={c.id}
-                className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                className="flex items-center justify-between gap-3 rounded-xl border border-border/70 p-3"
               >
                 <div className="min-w-0 flex-1">
                   <div className="font-medium">{c.name}</div>
@@ -108,8 +108,8 @@ export function AdminDashboardPage() {
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       c.approval_status === "approved"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                        : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                        ? "bg-primary/15 text-primary"
+                        : "bg-warning/20 text-warning-foreground"
                     }`}
                   >
                     {c.approval_status === "approved" ? "Approved" : "Pending"}

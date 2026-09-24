@@ -69,7 +69,7 @@ export function BranchesPage() {
   return (
     <div className="mx-auto w-full max-w-md space-y-4 sm:max-w-5xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Branches & Stores</h1>
+        <h1 className="font-display text-xl font-semibold tracking-tight">Branches & stores</h1>
         <Button
           variant="outline"
           size="sm"
